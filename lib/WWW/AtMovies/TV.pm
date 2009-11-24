@@ -2,6 +2,7 @@ package WWW::AtMovies::TV;
 use Moose;
 use WWW::Mechanize;
 use HTML::TableExtract;
+#use Smart::Comments;
 
 =head1 NAME
 
@@ -9,12 +10,12 @@ WWW::AtMovies::TV - retrieve TV information from http://www.atmovies.com.tw/
 
 =head1 VERSION
 
-Version 0.03
+Version 0.04
 
 =cut
 
-use version; our $VERSION = qv('0.03');
-my $base_url = 'http://app.atmovies.com.tw/tv/attv.cfm?action=showtime&groupid=M';
+use version; our $VERSION = qv('0.04');
+my $base_url = 'http://tv.atmovies.com.tw/tv/attv.cfm?action=showtime&groupid=M';
 
 has 'content' => ( is => 'rw', isa => 'Str'     );
 has 'mech'    => ( is => 'rw', isa => 'Ref'     );
@@ -49,9 +50,11 @@ sub _init {
 
     # top
     my @links = grep { $_->url_abs =~ /tvdata/ } $mech->links;
+    ### @links
 
     my (%ch_name, %data);
     foreach my $ch_id (56..58, 60..62) {
+	### $ch_id
         my $ch_name = $mech->find_link( url_regex => qr/$ch_id$/ )->text;
         $ch_name{"CH$ch_id"} = $ch_name;
     }
@@ -70,9 +73,9 @@ sub _init {
         my $te = HTML::TableExtract->new;
         $te->parse($mech->content);
         my @tables = $te->tables;
-        my $date = $tables[1]->rows->[0]->[1];
-        my $time = $tables[1]->rows->[1]->[1];
+        my ($date, $time) = split q{ }, $tables[1]->rows->[1]->[0];
 
+	### info
         my %info = (
             name => $name,
             date => $date,
@@ -80,15 +83,19 @@ sub _init {
             ch_name => $ch_name,
             ch_id   => $ch_id,
         );
+	### %info
 
-        # film page
-        $mech->follow_link( url_regex => qr/filmdata/ );
-        my ($imdb_url) = grep { $_ =~ /imdb/ } map { $_->url_abs } $mech->links;
+        ### film page
+	if ($mech->content =~ /filmdata/) {
+	    $mech->follow_link( url_regex => qr/filmdata/ );
+	    my ($imdb_url) = grep { $_ =~ /imdb/ } 
+			     map { $_->url_abs } $mech->links;
 
-        if (defined $imdb_url) {
-            my ($imdb_id) = $imdb_url =~ /(\d+)$/;
-            $info{imdb_id} = $imdb_id;
-        }
+	    if (defined $imdb_url) {
+		my ($imdb_id) = $imdb_url =~ /(\d+)$/;
+		$info{imdb_id} = $imdb_id;
+	    }
+	}
 
         $data{$type}->{$ch_name} = \%info;
     }
